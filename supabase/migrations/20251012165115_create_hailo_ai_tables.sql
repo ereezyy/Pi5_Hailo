@@ -125,25 +125,22 @@ ALTER TABLE inference_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inference_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accelerator_stats ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies for ai_models (publicly readable)
+-- RLS Policies for ai_models (publicly readable and writable for demo)
 CREATE POLICY "Anyone can view AI models"
   ON ai_models FOR SELECT
   USING (true);
 
-CREATE POLICY "Authenticated users can create models"
+CREATE POLICY "Anyone can create AI models"
   ON ai_models FOR INSERT
-  TO authenticated
   WITH CHECK (true);
 
-CREATE POLICY "Authenticated users can update models"
+CREATE POLICY "Anyone can update AI models"
   ON ai_models FOR UPDATE
-  TO authenticated
   USING (true)
   WITH CHECK (true);
 
-CREATE POLICY "Authenticated users can delete models"
+CREATE POLICY "Anyone can delete AI models"
   ON ai_models FOR DELETE
-  TO authenticated
   USING (true);
 
 -- RLS Policies for inference_tasks (publicly readable and writable for demo)
