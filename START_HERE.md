@@ -1,6 +1,6 @@
 # 🚀 ONE-CLICK START
 
-## Quick Start (3 Steps)
+## Quick Start (4 Steps)
 
 ### 1. Open Terminal on your Raspberry Pi
 
@@ -9,7 +9,13 @@
 cd ~/Pi5_Hailo
 ```
 
-### 3. Run the start script:
+### 3. Download Hailo models (first time only):
+```bash
+./download_models.sh
+```
+This finds available models on your system and downloads the model zoo.
+
+### 4. Run the start script:
 ```bash
 ./start.sh
 ```
@@ -78,5 +84,33 @@ tail -f web_dashboard.log
 - Upload test images in the Batch tab
 - Monitor your Hailo temperature and FPS in real-time
 - Export analytics reports
+
+---
+
+## 🎯 Available AI Models
+
+Your dashboard comes pre-configured with popular models:
+
+**Object Detection:**
+- YOLOv5s/m - Fast general object detection
+- YOLOv8s/m - Latest YOLO variants
+- YOLOv6n - Optimized for edge devices
+- YOLOX-s - Enhanced YOLO architecture
+
+**Classification:**
+- ResNet50 - 1000 image classes
+- MobileNetV2 - Lightweight classification
+- EfficientNet-B0 - Efficient classification
+
+**Segmentation:**
+- YOLOv5n-seg - Instance segmentation
+- Fast-SCNN - Semantic segmentation
+
+**Pose Estimation:**
+- YOLOv8n-pose - Human pose detection
+
+To use these models, download the HEF files from:
+- **Hailo Developer Zone**: https://hailo.ai/developer-zone/
+- Or run: `./download_models.sh` to check system locations
 
 **Enjoy your AI-powered Raspberry Pi!** 🎉
