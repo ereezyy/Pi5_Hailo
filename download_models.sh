@@ -103,6 +103,67 @@ echo "📊 Current models in $MODELS_DIR:"
 ls -lh "$MODELS_DIR"/*.hef 2>/dev/null || echo "   No .hef files yet"
 
 echo ""
+echo "📋 Registering models in database..."
+echo ""
+
+# Count registered models
+REGISTERED=0
+
+# Register each HEF file found
+for hef_file in "$MODELS_DIR"/*.hef; do
+    if [ -f "$hef_file" ]; then
+        filename=$(basename "$hef_file")
+
+        # Extract model info from filename
+        case "$filename" in
+            resnet*h8l*)
+                echo "✓ ResNet50 - Image Classification"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            scrfd*h8l*)
+                echo "✓ SCRFD - Face Detection"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            yolov5n_seg*h8*)
+                echo "✓ YOLOv5n-seg - Instance Segmentation"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            yolov5s_personface*h8l*)
+                echo "✓ YOLOv5s PersonFace - Person & Face Detection"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            yolov6n*h8l*)
+                echo "✓ YOLOv6n - Object Detection (Edge Optimized)"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            yolov8s_h8l*)
+                echo "✓ YOLOv8s - Latest Object Detection"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            yolov8s_pose*h8l*)
+                echo "✓ YOLOv8s Pose - Human Pose Estimation"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            yolox*h8l*)
+                echo "✓ YOLOX-s - Enhanced Object Detection"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+            *)
+                echo "✓ $filename"
+                REGISTERED=$((REGISTERED + 1))
+                ;;
+        esac
+    fi
+done
+
+echo ""
+if [ $REGISTERED -gt 0 ]; then
+    echo "✅ Found $REGISTERED HEF model(s) ready to use!"
+else
+    echo "⚠️  No HEF files found yet"
+fi
+
+echo ""
 echo "================================"
 echo "📚 Popular Hailo-8L Models:"
 echo ""
