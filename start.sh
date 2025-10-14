@@ -37,7 +37,7 @@ echo "✅ Python service started successfully"
 
 # Start web dashboard
 echo "🌐 Starting Web Dashboard (port 5173)..."
-npm run dev -- --host > web_dashboard.log 2>&1 &
+npm run dev > web_dashboard.log 2>&1 &
 WEB_PID=$!
 echo "   Web dashboard PID: $WEB_PID"
 
