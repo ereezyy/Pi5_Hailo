@@ -30,21 +30,31 @@ export function ModelBenchmark({ models }: ModelBenchmarkProps) {
 
     try {
       const modelsToTest = selectedModel === 'all' ? models : models.filter(m => m.id === selectedModel);
+      const modelIds = modelsToTest.map(m => m.id);
       const benchmarkResults: BenchmarkResult[] = [];
 
-      for (const model of modelsToTest) {
-        const { data: tasks } = await supabase
-          .from('inference_tasks')
-          .select(`
-            id,
-            status,
-            inference_results (
-              processing_time_ms
-            )
-          `)
-          .eq('model_id', model.id);
+      const { data: allTasks } = await supabase
+        .from('inference_tasks')
+        .select(`
+          id,
+          model_id,
+          status,
+          inference_results (
+            processing_time_ms
+          )
+        `)
+        .in('model_id', modelIds);
 
-        if (!tasks || tasks.length === 0) continue;
+      const tasksByModel = (allTasks || []).reduce((acc, task) => {
+        if (!acc[task.model_id]) acc[task.model_id] = [];
+        acc[task.model_id].push(task);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      for (const model of modelsToTest) {
+        const tasks = tasksByModel[model.id] || [];
+
+        if (tasks.length === 0) continue;
 
         const completedTasks = tasks.filter(t => t.status === 'completed');
         const processingTimes = completedTasks
