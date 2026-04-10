@@ -45,22 +45,22 @@ export function ResultsViewer() {
   const loadResults = async () => {
     const { data: resultsData, error } = await supabase
       .from('inference_results')
-      .select('*')
+      .select('*, task:inference_tasks(*)')
       .order('created_at', { ascending: false })
       .limit(10);
 
     if (!error && resultsData) {
-      const resultsWithTasks = await Promise.all(
-        resultsData.map(async (result) => {
-          const { data: task } = await supabase
-            .from('inference_tasks')
-            .select('*')
-            .eq('id', result.task_id)
-            .single();
-
-          return { ...result, task: task! };
-        })
-      );
+      // ⚡ Bolt: Fixed N+1 query problem by fetching tasks along with results
+      // Mapping Supabase relationship result to expected structure
+      const resultsWithTasks = resultsData.map(result => {
+        // Supabase returns an array for many-to-one sometimes, or single object depending on constraints
+        // Using type assertion since we know the structure
+        const task = Array.isArray(result.task) ? result.task[0] : result.task;
+        return {
+          ...result,
+          task
+        };
+      }) as ResultWithTask[];
 
       const filtered = resultsWithTasks.filter(r => r.task);
       setResults(filtered);
