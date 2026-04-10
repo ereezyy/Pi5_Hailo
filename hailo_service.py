@@ -158,8 +158,30 @@ class HailoService:
                 "mode": "error"
             }
 
+    def is_safe_path(self, path, allowed_dirs):
+        """Check if a path is safely within allowed directories"""
+        if not path:
+            return False
+        try:
+            real_path = os.path.realpath(path)
+            for d in allowed_dirs:
+                if not os.path.exists(d):
+                    continue
+                real_dir = os.path.realpath(d)
+                if os.path.commonpath([real_dir, real_path]) == real_dir:
+                    return True
+        except Exception as e:
+            print(f"Path validation error: {e}")
+            pass
+        return False
+
     def run_inference(self, hef_path, image_path):
         """Run inference on an image using specified model"""
+        # Security: Prevent path traversal by validating the model path
+        if not self.is_safe_path(hef_path, self.model_paths):
+            print(f"SECURITY WARNING: Attempted path traversal detected: {hef_path}")
+            return {"success": False, "error": "Invalid model path", "mode": "error"}
+
         if not HAILO_AVAILABLE or not self.device:
             return self.simulate_inference()
 
