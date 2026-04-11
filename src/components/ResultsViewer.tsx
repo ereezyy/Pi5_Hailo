@@ -43,25 +43,20 @@ export function ResultsViewer() {
   }, []);
 
   const loadResults = async () => {
-    const { data: resultsData, error } = await supabase
+    // ⚡ Bolt: Fixed N+1 query problem by using Supabase's joined query syntax
+    // Reduced queries from 11 (1 + 10) to 1, significantly improving load time
+    const { data, error } = await supabase
       .from('inference_results')
-      .select('*')
+      .select(`
+        *,
+        task:inference_tasks (*)
+      `)
       .order('created_at', { ascending: false })
       .limit(10);
 
-    if (!error && resultsData) {
-      const resultsWithTasks = await Promise.all(
-        resultsData.map(async (result) => {
-          const { data: task } = await supabase
-            .from('inference_tasks')
-            .select('*')
-            .eq('id', result.task_id)
-            .single();
-
-          return { ...result, task: task! };
-        })
-      );
-
+    if (!error && data) {
+      // @ts-expect-error - Supabase type generation doesn't perfectly handle joins yet
+      const resultsWithTasks = data as unknown as ResultWithTask[];
       const filtered = resultsWithTasks.filter(r => r.task);
       setResults(filtered);
       setFilteredResults(filtered);
