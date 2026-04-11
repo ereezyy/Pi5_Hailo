@@ -37,6 +37,18 @@ class HailoService:
         if HAILO_AVAILABLE:
             self.initialize_device()
 
+    def _is_safe_path(self, requested_path):
+        """Validate that a requested path is within allowed model paths"""
+        try:
+            real_requested = os.path.realpath(requested_path)
+            for allowed in self.model_paths:
+                real_allowed = os.path.realpath(allowed)
+                if os.path.commonpath([real_allowed, real_requested]) == real_allowed:
+                    return True
+            return False
+        except Exception:
+            return False
+
     def initialize_device(self):
         """Initialize connection to Hailo device"""
         try:
@@ -72,6 +84,10 @@ class HailoService:
 
     def get_model_info(self, hef_path):
         """Get information about a HEF model file"""
+        if not self._is_safe_path(hef_path):
+            print(f"Security: Blocked unauthorized model path access: {hef_path}")
+            return None
+
         if not HAILO_AVAILABLE:
             return None
 
@@ -160,6 +176,10 @@ class HailoService:
 
     def run_inference(self, hef_path, image_path):
         """Run inference on an image using specified model"""
+        if not self._is_safe_path(hef_path):
+            print(f"Security: Blocked unauthorized inference model path access: {hef_path}")
+            return {"success": False, "error": "Invalid or unauthorized model path"}
+
         if not HAILO_AVAILABLE or not self.device:
             return self.simulate_inference()
 
