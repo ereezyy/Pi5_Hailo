@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
 
 type AIModel = Database['public']['Tables']['ai_models']['Row'];
+type InferenceTask = Database['public']['Tables']['inference_tasks']['Row'];
+type InferenceResult = Database['public']['Tables']['inference_results']['Row'];
 
 interface ModelStats {
   modelId: string;
@@ -33,38 +35,47 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
     setLoading(true);
 
     try {
+      // ⚡ Bolt: Fixed N+1 query problem by batching all tasks in a single request.
+      // Reduces queries from O(N) to O(1), significantly improving load times when there are many models.
+      let query = supabase
+        .from('inference_tasks')
+        .select(`
+          id,
+          model_id,
+          status,
+          created_at,
+          inference_results (
+            processing_time_ms,
+            result_data,
+            confidence_scores
+          )
+        `)
+        .in('model_id', models.map(m => m.id));
+
+      if (timeRange !== 'all') {
+        const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720;
+        const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        query = query.gte('created_at', cutoff);
+      }
+
+      const allTasksRaw = await query;
+      const allTasks = allTasksRaw.data as unknown as (InferenceTask & { inference_results: InferenceResult[] | InferenceResult | null })[];
+
       const modelStats: ModelStats[] = [];
 
       for (const model of models) {
-        let query = supabase
-          .from('inference_tasks')
-          .select(`
-            id,
-            status,
-            created_at,
-            inference_results (
-              processing_time_ms,
-              result_data,
-              confidence_scores
-            )
-          `)
-          .eq('model_id', model.id);
+        const tasks = allTasks ? allTasks.filter(t => t.model_id === model.id) : [];
 
-        if (timeRange !== 'all') {
-          const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720;
-          const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-          query = query.gte('created_at', cutoff);
-        }
-
-        const { data: tasks } = await query;
-
-        if (!tasks || tasks.length === 0) continue;
+        if (tasks.length === 0) continue;
 
         const completed = tasks.filter(t => t.status === 'completed');
         const failed = tasks.filter(t => t.status === 'failed');
 
         const processingTimes = completed
-          .map(t => t.inference_results?.[0]?.processing_time_ms)
+          .map(t => {
+            const results = t.inference_results;
+            return Array.isArray(results) ? results[0]?.processing_time_ms : results?.processing_time_ms;
+          })
           .filter((t): t is number => typeof t === 'number');
 
         const avgProcessingTime =
@@ -77,13 +88,15 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
         let confidenceCount = 0;
 
         completed.forEach(task => {
-          const result = task.inference_results?.[0];
+          const results = task.inference_results;
+          const result = Array.isArray(results) ? results[0] : results;
+
           if (result) {
             const detections = Array.isArray(result.result_data) ? result.result_data : [];
             totalDetections += detections.length;
 
             const scores = Array.isArray(result.confidence_scores) ? result.confidence_scores : [];
-            scores.forEach(score => {
+            scores.forEach((score: unknown) => {
               if (typeof score === 'number') {
                 confidenceSum += score;
                 confidenceCount++;
@@ -131,6 +144,7 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
 
         <select
           value={timeRange}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onChange={(e) => setTimeRange(e.target.value as any)}
           className="px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-pink-500 focus:outline-none"
         >
