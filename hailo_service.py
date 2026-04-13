@@ -23,6 +23,23 @@ except ImportError:
     print("WARNING: HailoRT not available. Running in simulation mode.")
     HAILO_AVAILABLE = False
 
+def is_safe_path(path, allowed_dirs):
+    """Check if a path is safe and within allowed directories"""
+    if not path:
+        return False
+
+    try:
+        # Resolve path including symlinks
+        real_path = os.path.realpath(path)
+        for allowed_dir in allowed_dirs:
+            real_allowed = os.path.realpath(allowed_dir)
+            # Use commonpath to check if real_path starts with real_allowed
+            if os.path.commonpath([real_path, real_allowed]) == real_allowed:
+                return True
+    except (ValueError, OSError):
+        return False
+    return False
+
 class HailoService:
     def __init__(self):
         self.device = None
@@ -32,6 +49,11 @@ class HailoService:
             "/home/pi/hailo-models",
             str(Path.home() / "hailo-models"),
             "/opt/hailo/models"
+        ]
+        self.image_paths = [
+            "/tmp",
+            "/home/pi/images",
+            str(Path.home() / "images")
         ]
 
         if HAILO_AVAILABLE:
@@ -260,6 +282,13 @@ def run_inference():
 
     hef_path = data.get('modelPath')
     image_path = data.get('imagePath', '/tmp/test_image.jpg')
+
+    # Security validation for paths
+    if not hef_path or not is_safe_path(hef_path, hailo_service.model_paths):
+        return jsonify({"success": False, "error": "Invalid or unauthorized model path"}), 400
+
+    if not is_safe_path(image_path, hailo_service.image_paths):
+        return jsonify({"success": False, "error": "Invalid or unauthorized image path"}), 400
 
     result = hailo_service.run_inference(hef_path, image_path)
     result['taskId'] = data.get('taskId', 'unknown')
