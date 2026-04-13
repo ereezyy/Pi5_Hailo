@@ -49,6 +49,30 @@ class HailoService:
         except Exception:
             return False
 
+
+    def _is_safe_image_path(self, requested_path):
+        """Validate that an image path is within allowed directories"""
+        try:
+            # Allow basic filenames (common in the mock UI)
+            if os.path.basename(requested_path) == requested_path and not requested_path.startswith('/'):
+                return True
+
+            allowed_dirs = [
+                "/tmp",
+                "/home/pi",
+                "/opt/hailo",
+                os.path.abspath(os.getcwd())
+            ]
+
+            real_requested = os.path.realpath(requested_path)
+            for allowed in allowed_dirs:
+                real_allowed = os.path.realpath(allowed)
+                if os.path.commonpath([real_allowed, real_requested]) == real_allowed:
+                    return True
+            return False
+        except Exception:
+            return False
+
     def initialize_device(self):
         """Initialize connection to Hailo device"""
         try:
@@ -179,6 +203,10 @@ class HailoService:
         if not self._is_safe_path(hef_path):
             print(f"Security: Blocked unauthorized inference model path access: {hef_path}")
             return {"success": False, "error": "Invalid or unauthorized model path"}
+
+        if not self._is_safe_image_path(image_path):
+            print(f"Security: Blocked unauthorized image path access: {image_path}")
+            return {"success": False, "error": "Invalid or unauthorized image path"}
 
         if not HAILO_AVAILABLE or not self.device:
             return self.simulate_inference()
