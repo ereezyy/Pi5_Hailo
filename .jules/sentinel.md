@@ -7,3 +7,8 @@
 **Vulnerability:** Arbitrary file loading via `imagePath` in `hailo_service.py` API parameters leading to arbitrary file reads when preprocessing images.
 **Learning:** Security validation must be consistently applied to all user-controlled file paths. Even if primary paths (like `modelPath`) are validated, missing validation on secondary inputs (like `imagePath`) creates a path traversal vulnerability.
 **Prevention:** Implement comprehensive path validation helper functions (`_is_safe_image_path`) for all paths using `os.path.realpath()` and `os.path.commonpath()`, and apply them rigorously before any filesystem operation (like `Image.open()`).
+
+## 2024-05-24 - Information Exposure via Error Messages
+**Vulnerability:** Leaking raw database or internal server error messages (`error.message`) to the frontend in `useHailoModels.ts` and from the edge function in `hailo-inference/index.ts`.
+**Learning:** Returning raw error messages from backend services or directly rendering raw database errors in the UI can expose sensitive information such as database schemas, internal paths, or unhandled exception details, which violates the "Fail Securely" principle.
+**Prevention:** Always sanitize error messages. Log detailed error traces internally (`console.error` server-side or frontend console for debugging) but return generic, user-friendly error strings to the client or UI to prevent information disclosure.
