@@ -35,33 +35,62 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
     try {
       const modelStats: ModelStats[] = [];
 
+      // ⚡ Bolt: Fixed N+1 query problem by batching task fetching for all models into a single query.
+      // Instead of querying `inference_tasks` sequentially for each model in a loop,
+      // we now fetch all relevant tasks once and group them by model_id in memory.
+      // This reduces network requests from O(N) to O(1) and significantly improves load time.
+      if (models.length === 0) {
+        setStats([]);
+        setLoading(false);
+        return;
+      }
+
+      const modelIds = models.map(m => m.id);
+
+      let query = supabase
+        .from('inference_tasks')
+        .select(`
+          id,
+          model_id,
+          status,
+          created_at,
+          inference_results (
+            processing_time_ms,
+            result_data,
+            confidence_scores
+          )
+        `)
+        .in('model_id', modelIds);
+
+      if (timeRange !== 'all') {
+        const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720;
+        const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        query = query.gte('created_at', cutoff);
+      }
+
+      const { data: allTasks, error } = await query;
+
+      if (error) {
+        console.error('Error fetching analytics data:', error);
+        throw error;
+      }
+
+      const tasksByModel = (allTasks || []).reduce((acc, task) => {
+        if (!acc[task.model_id]) acc[task.model_id] = [];
+        acc[task.model_id].push(task);
+        return acc;
+      }, {} as Record<string, typeof allTasks>);
+
       for (const model of models) {
-        let query = supabase
-          .from('inference_tasks')
-          .select(`
-            id,
-            status,
-            created_at,
-            inference_results (
-              processing_time_ms,
-              result_data,
-              confidence_scores
-            )
-          `)
-          .eq('model_id', model.id);
+        const tasks = tasksByModel[model.id] || [];
 
-        if (timeRange !== 'all') {
-          const hours = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720;
-          const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-          query = query.gte('created_at', cutoff);
-        }
+        if (tasks.length === 0) continue;
 
-        const { data: tasks } = await query;
+        // @ts-expect-error - Supabase type generation doesn't perfectly handle joins yet
+        const typedTasks = tasks as unknown as any[];
 
-        if (!tasks || tasks.length === 0) continue;
-
-        const completed = tasks.filter(t => t.status === 'completed');
-        const failed = tasks.filter(t => t.status === 'failed');
+        const completed = typedTasks.filter(t => t.status === 'completed');
+        const failed = typedTasks.filter(t => t.status === 'failed');
 
         const processingTimes = completed
           .map(t => t.inference_results?.[0]?.processing_time_ms)
@@ -69,7 +98,7 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
 
         const avgProcessingTime =
           processingTimes.length > 0
-            ? processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length
+            ? processingTimes.reduce((a: number, b: number) => a + b, 0) / processingTimes.length
             : 0;
 
         let totalDetections = 0;
