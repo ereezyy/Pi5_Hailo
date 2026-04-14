@@ -28,7 +28,7 @@ export function useHailoModels() {
       setModels(data || []);
     } catch (err) {
       console.error('Error loading models:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load models');
+      setError('Failed to load models. Please try again later.');
     } finally {
       setLoading(false);
     }
