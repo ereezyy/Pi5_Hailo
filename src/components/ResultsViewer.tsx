@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, Download, Clock, Target, Filter, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -12,7 +12,7 @@ interface ResultWithTask extends InferenceResult {
 
 export function ResultsViewer() {
   const [results, setResults] = useState<ResultWithTask[]>([]);
-  const [filteredResults, setFilteredResults] = useState<ResultWithTask[]>([]);
+
   const [selectedResult, setSelectedResult] = useState<ResultWithTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -59,39 +59,38 @@ export function ResultsViewer() {
       const resultsWithTasks = data as unknown as ResultWithTask[];
       const filtered = resultsWithTasks.filter(r => r.task);
       setResults(filtered);
-      setFilteredResults(filtered);
     }
     setLoading(false);
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, results]);
-
-  const applyFilters = () => {
-    let filtered = [...results];
-
-    if (filters.searchTerm) {
-      filtered = filtered.filter(r =>
-        r.task.task_name.toLowerCase().includes(filters.searchTerm.toLowerCase())
-      );
-    }
-
-    filtered = filtered.filter(r => {
+  // ⚡ Bolt: Replaced useEffect cascade with useMemo to prevent double-renders.
+  // Also computed derived data (detections, avgConfidence) during filtering
+  // to avoid O(N) array reductions on every render cycle.
+  // Compute derived data (detections, avgConfidence) once when results change
+  const computedResults = React.useMemo(() => {
+    return results.map(r => {
       const detections = Array.isArray(r.result_data) ? r.result_data : [];
-      const avgConfidence = Array.isArray(r.confidence_scores)
-        ? r.confidence_scores.reduce((a: number, b: number) => a + b, 0) / r.confidence_scores.length
+      const scores = Array.isArray(r.confidence_scores) ? r.confidence_scores as number[] : [];
+      const avgConfidence = scores.length > 0
+        ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length
         : 0;
+      return { ...r, _computed: { detections, avgConfidence } };
+    });
+  }, [results]);
 
+  // Filter the pre-computed results when filters change
+  const filteredResults = React.useMemo(() => {
+    return computedResults.filter(r => {
+      if (filters.searchTerm && !r.task.task_name.toLowerCase().includes(filters.searchTerm.toLowerCase())) {
+        return false;
+      }
       return (
-        avgConfidence >= filters.minConfidence &&
+        r._computed.avgConfidence >= filters.minConfidence &&
         r.processing_time_ms <= filters.maxProcessingTime &&
-        detections.length >= filters.minDetections
+        r._computed.detections.length >= filters.minDetections
       );
     });
-
-    setFilteredResults(filtered);
-  };
+  }, [computedResults, filters]);
 
   const resetFilters = () => {
     setFilters({
@@ -232,10 +231,7 @@ export function ResultsViewer() {
       ) : (
         <div className="space-y-3">
           {filteredResults.map((result) => {
-            const detections = Array.isArray(result.result_data) ? result.result_data : [];
-            const avgConfidence = Array.isArray(result.confidence_scores)
-              ? result.confidence_scores.reduce((a: number, b: number) => a + b, 0) / result.confidence_scores.length
-              : 0;
+            const { detections, avgConfidence } = result._computed;
 
             return (
               <div
