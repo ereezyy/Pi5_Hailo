@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Video, Play, Square, Camera, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -17,6 +17,7 @@ interface Detection {
 }
 
 export function VideoStream({ models, selectedModel }: VideoStreamProps) {
+  const modelsMap = useMemo(() => new Map(models.map(m => [m.id, m])), [models]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isInferencing, setIsInferencing] = useState(false);
   const [fps, setFps] = useState(0);
@@ -94,7 +95,7 @@ export function VideoStream({ models, selectedModel }: VideoStreamProps) {
   const runInference = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
-    const model = models.find(m => m.id === selectedModel);
+    const model = modelsMap.get(selectedModel);
     if (!model) return;
 
     const video = videoRef.current;
