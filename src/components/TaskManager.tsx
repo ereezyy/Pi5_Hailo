@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Play, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -14,6 +14,7 @@ interface TaskManagerProps {
 }
 
 export function TaskManager({ tasks, models, selectedModel, onTasksChange }: TaskManagerProps) {
+  const modelsMap = useMemo(() => new Map(models.map(m => [m.id, m])), [models]);
   const [showNewTask, setShowNewTask] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [inputSource, setInputSource] = useState('camera');
@@ -54,7 +55,7 @@ export function TaskManager({ tasks, models, selectedModel, onTasksChange }: Tas
         .eq('id', taskId);
 
       const task = tasks.find(t => t.id === taskId);
-      const model = models.find(m => m.id === task?.model_id);
+      const model = task?.model_id ? modelsMap.get(task.model_id) : undefined;
 
       if (!task || !model) return;
 
@@ -203,7 +204,7 @@ export function TaskManager({ tasks, models, selectedModel, onTasksChange }: Tas
           </div>
         ) : (
           tasks.map((task) => {
-            const model = models.find(m => m.id === task.model_id);
+            const model = modelsMap.get(task.model_id);
             return (
               <div
                 key={task.id}

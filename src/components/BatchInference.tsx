@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Upload, Layers, Play, Trash2, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -19,6 +19,7 @@ interface BatchImage {
 }
 
 export function BatchInference({ models, selectedModel }: BatchInferenceProps) {
+  const modelsMap = useMemo(() => new Map(models.map(m => [m.id, m])), [models]);
   const [images, setImages] = useState<BatchImage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -59,7 +60,7 @@ export function BatchInference({ models, selectedModel }: BatchInferenceProps) {
     setIsProcessing(true);
     setProgress(0);
 
-    const model = models.find(m => m.id === selectedModel);
+    const model = modelsMap.get(selectedModel);
     if (!model) return;
 
     for (let i = 0; i < images.length; i++) {

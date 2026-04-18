@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ListOrdered, Play, Pause, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -15,6 +15,7 @@ interface QueueTask extends InferenceTask {
 }
 
 export function InferenceQueue({ models }: InferenceQueueProps) {
+  const modelsMap = useMemo(() => new Map(models.map(m => [m.id, m])), [models]);
   const [queue, setQueue] = useState<QueueTask[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTask, setCurrentTask] = useState<QueueTask | null>(null);
@@ -49,7 +50,7 @@ export function InferenceQueue({ models }: InferenceQueueProps) {
     if (!error && data) {
       const tasksWithModels = data.map(task => ({
         ...task,
-        model: models.find(m => m.id === task.model_id),
+        model: modelsMap.get(task.model_id),
       }));
       setQueue(tasksWithModels);
     }
@@ -102,7 +103,7 @@ export function InferenceQueue({ models }: InferenceQueueProps) {
       }
 
       const task = tasks[0];
-      const model = models.find(m => m.id === task.model_id);
+      const model = modelsMap.get(task.model_id);
 
       setCurrentTask({ ...task, model });
 
