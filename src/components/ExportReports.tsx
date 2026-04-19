@@ -72,50 +72,76 @@ export function ExportReports({ models }: ExportReportsProps) {
       },
     };
 
+    if (models.length === 0) return analytics;
+
+    const modelIds = models.map(m => m.id);
+    let query = supabase
+      .from('inference_tasks')
+      .select(`
+        id,
+        model_id,
+        status,
+        created_at,
+        inference_results (
+          processing_time_ms,
+          result_data,
+          confidence_scores
+        )
+      `)
+      .in('model_id', modelIds);
+
+    const cutoff = getDateFilter();
+    if (cutoff) {
+      query = query.gte('created_at', cutoff);
+    }
+
+    const { data: allTasks, error } = await query;
+
+    if (error) {
+      console.error('Error fetching analytics data for export:', error);
+      return analytics;
+    }
+
+    const tasksByModel = (allTasks || []).reduce((acc, task) => {
+      if (!acc[task.model_id]) acc[task.model_id] = [];
+      acc[task.model_id].push(task);
+      return acc;
+    }, {} as Record<string, typeof allTasks>);
+
+    const allProcessingTimes: number[] = [];
+
     for (const model of models) {
-      let query = supabase
-        .from('inference_tasks')
-        .select(`
-          id,
-          status,
-          created_at,
-          inference_results (
-            processing_time_ms,
-            result_data,
-            confidence_scores
-          )
-        `)
-        .eq('model_id', model.id);
+      const tasks = tasksByModel[model.id] || [];
 
-      const cutoff = getDateFilter();
-      if (cutoff) {
-        query = query.gte('created_at', cutoff);
-      }
-
-      const { data: tasks } = await query;
-
-      if (!tasks || tasks.length === 0) continue;
+      if (tasks.length === 0) continue;
 
       const completed = tasks.filter(t => t.status === 'completed');
       const failed = tasks.filter(t => t.status === 'failed');
 
-      const processingTimes = completed
+      // @ts-expect-error - Supabase type generation doesn't perfectly handle joins yet
+      const typedCompleted = completed as unknown as any[];
+
+      const processingTimes = typedCompleted
         .map(t => t.inference_results?.[0]?.processing_time_ms)
         .filter((t): t is number => typeof t === 'number');
 
+      allProcessingTimes.push(...processingTimes);
+
       const avgTime =
         processingTimes.length > 0
-          ? processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length
+          ? processingTimes.reduce((a: number, b: number) => a + b, 0) / processingTimes.length
           : 0;
 
       let totalDetections = 0;
-      completed.forEach(task => {
+      typedCompleted.forEach(task => {
         const result = task.inference_results?.[0];
         if (result && Array.isArray(result.result_data)) {
           totalDetections += result.result_data.length;
         }
       });
 
+      // ⚡ Bolt: Fixed N+1 query problem by batching task fetching for all models.
+      // Eliminates looping through models for multiple queries.
       analytics.models.push({
         model_name: model.name,
         model_type: model.model_type,
@@ -134,32 +160,6 @@ export function ExportReports({ models }: ExportReportsProps) {
     }
 
     if (analytics.summary.completed_tasks > 0) {
-      const allProcessingTimes: number[] = [];
-
-      for (const model of models) {
-        let query = supabase
-          .from('inference_tasks')
-          .select('inference_results(processing_time_ms)')
-          .eq('model_id', model.id)
-          .eq('status', 'completed');
-
-        const cutoff = getDateFilter();
-        if (cutoff) {
-          query = query.gte('created_at', cutoff);
-        }
-
-        const { data } = await query;
-
-        if (data) {
-          data.forEach((task: any) => {
-            const time = task.inference_results?.[0]?.processing_time_ms;
-            if (typeof time === 'number') {
-              allProcessingTimes.push(time);
-            }
-          });
-        }
-      }
-
       analytics.summary.avg_processing_time =
         allProcessingTimes.length > 0
           ? allProcessingTimes.reduce((a, b) => a + b, 0) / allProcessingTimes.length
