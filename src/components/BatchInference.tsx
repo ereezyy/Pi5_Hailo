@@ -72,24 +72,21 @@ export function BatchInference({ models, selectedModel }: BatchInferenceProps) {
       );
 
       try {
+        // ⚡ Bolt: Removed redundant UPDATE query by initializing status to 'processing' directly
         const { data: task, error: taskError } = await supabase
           .from('inference_tasks')
           .insert({
             model_id: selectedModel,
             task_name: `Batch: ${image.file.name}`,
-            status: 'pending',
+            status: 'processing',
             input_source: 'file',
             input_path: image.file.name,
+            started_at: new Date().toISOString(),
           })
           .select()
           .single();
 
         if (taskError) throw taskError;
-
-        await supabase
-          .from('inference_tasks')
-          .update({ status: 'processing', started_at: new Date().toISOString() })
-          .eq('id', task.id);
 
         const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hailo-inference/run-inference`;
 
@@ -110,17 +107,19 @@ export function BatchInference({ models, selectedModel }: BatchInferenceProps) {
         if (response.ok) {
           const result = await response.json();
 
-          await supabase.from('inference_results').insert({
-            task_id: task.id,
-            result_data: result.detections,
-            confidence_scores: result.detections.map((d: any) => d.confidence),
-            processing_time_ms: result.processingTimeMs,
-          });
-
-          await supabase
-            .from('inference_tasks')
-            .update({ status: 'completed', completed_at: new Date().toISOString() })
-            .eq('id', task.id);
+          // ⚡ Bolt: Parallelized independent DB writes to halve network wait time
+          await Promise.all([
+            supabase.from('inference_results').insert({
+              task_id: task.id,
+              result_data: result.detections,
+              confidence_scores: result.detections.map((d: any) => d.confidence),
+              processing_time_ms: result.processingTimeMs,
+            }),
+            supabase
+              .from('inference_tasks')
+              .update({ status: 'completed', completed_at: new Date().toISOString() })
+              .eq('id', task.id)
+          ]);
 
           setImages(prev =>
             prev.map(img =>

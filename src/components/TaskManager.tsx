@@ -84,17 +84,19 @@ export function TaskManager({ tasks, models, selectedModel, onTasksChange }: Tas
       if (response.ok) {
         const result = await response.json();
 
-        await supabase.from('inference_results').insert({
-          task_id: taskId,
-          result_data: result.detections,
-          confidence_scores: result.detections.map((d: any) => d.confidence),
-          processing_time_ms: result.processingTimeMs,
-        });
-
-        await supabase
-          .from('inference_tasks')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('id', taskId);
+        // ⚡ Bolt: Parallelized independent DB writes to halve network wait time
+        await Promise.all([
+          supabase.from('inference_results').insert({
+            task_id: taskId,
+            result_data: result.detections,
+            confidence_scores: result.detections.map((d: any) => d.confidence),
+            processing_time_ms: result.processingTimeMs,
+          }),
+          supabase
+            .from('inference_tasks')
+            .update({ status: 'completed', completed_at: new Date().toISOString() })
+            .eq('id', taskId)
+        ]);
 
         onTasksChange();
       } else {
