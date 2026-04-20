@@ -9,3 +9,6 @@
 ## 2024-05-25 - [Supabase Nested Loop Avoidance]
 **Learning:** `ExportReports.tsx` had an extreme case of N+1 queries where it iterated over a list of `models`, doing *two* separate queries per model. The second query could actually be completely skipped by extracting its logic into the first data aggregation pass.
 **Action:** When refactoring O(N) queries into a single `.in()` query, look for other query blocks in the same logical boundary that can be consolidated into the new grouped, in-memory processing loop to save network round-trips.
+## 2024-05-25 - [O(N^2) Array lookups in component iterations]
+**Learning:** In the frontend, using `Array.find()` inside loop iterators (like mapping lists to DOM elements or mapping API results) creates hidden O(N*M) bottlenecks.
+**Action:** Always pre-compute a lookup `Map` with `new Map(items.map(i => [i.id, i]))`, turning the O(N) iteration search into an O(1) key lookup. Use `useMemo` when this happens in a component render to ensure it isn't rebuilt unnecessarily.

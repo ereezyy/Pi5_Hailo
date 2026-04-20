@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Play, Clock, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -19,6 +19,13 @@ export function TaskManager({ tasks, models, selectedModel, onTasksChange }: Tas
   const [inputSource, setInputSource] = useState('camera');
   const [inputPath, setInputPath] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ⚡ Bolt Performance Optimization
+  // Replaced O(N) Array.find() inside render loop with O(1) Map lookup
+  // This prevents UI lag when rendering large lists of tasks
+  const modelsMap = useMemo(() => {
+    return new Map(models.map(m => [m.id, m]));
+  }, [models]);
 
   const createTask = async () => {
     if (!taskName.trim() || !selectedModel) return;
@@ -54,7 +61,7 @@ export function TaskManager({ tasks, models, selectedModel, onTasksChange }: Tas
         .eq('id', taskId);
 
       const task = tasks.find(t => t.id === taskId);
-      const model = models.find(m => m.id === task?.model_id);
+      const model = task ? modelsMap.get(task.model_id) : undefined;
 
       if (!task || !model) return;
 
@@ -203,7 +210,7 @@ export function TaskManager({ tasks, models, selectedModel, onTasksChange }: Tas
           </div>
         ) : (
           tasks.map((task) => {
-            const model = models.find(m => m.id === task.model_id);
+            const model = modelsMap.get(task.model_id);
             return (
               <div
                 key={task.id}
