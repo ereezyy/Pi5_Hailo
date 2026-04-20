@@ -72,29 +72,51 @@ export function ExportReports({ models }: ExportReportsProps) {
       },
     };
 
+    if (models.length === 0) return analytics;
+
+    const modelIds = models.map(m => m.id);
+
+    // ⚡ Bolt: Fixed N+1 query bottleneck by fetching all tasks for all models in a single batched query
+    let query = supabase
+      .from('inference_tasks')
+      .select(`
+        id,
+        model_id,
+        status,
+        created_at,
+        inference_results (
+          processing_time_ms,
+          result_data,
+          confidence_scores
+        )
+      `)
+      .in('model_id', modelIds);
+
+    const cutoff = getDateFilter();
+    if (cutoff) {
+      query = query.gte('created_at', cutoff);
+    }
+
+    const { data: allTasks, error } = await query;
+
+    if (error) {
+      console.error('Error fetching analytics data:', error);
+      return analytics;
+    }
+
+    // Group tasks by model ID in memory
+    const tasksByModel = (allTasks || []).reduce((acc, task) => {
+      if (!acc[task.model_id]) acc[task.model_id] = [];
+      acc[task.model_id].push(task);
+      return acc;
+    }, {} as Record<string, typeof allTasks>);
+
+    const allProcessingTimes: number[] = [];
+
     for (const model of models) {
-      let query = supabase
-        .from('inference_tasks')
-        .select(`
-          id,
-          status,
-          created_at,
-          inference_results (
-            processing_time_ms,
-            result_data,
-            confidence_scores
-          )
-        `)
-        .eq('model_id', model.id);
+      const tasks = tasksByModel[model.id] || [];
 
-      const cutoff = getDateFilter();
-      if (cutoff) {
-        query = query.gte('created_at', cutoff);
-      }
-
-      const { data: tasks } = await query;
-
-      if (!tasks || tasks.length === 0) continue;
+      if (tasks.length === 0) continue;
 
       const completed = tasks.filter(t => t.status === 'completed');
       const failed = tasks.filter(t => t.status === 'failed');
@@ -113,6 +135,12 @@ export function ExportReports({ models }: ExportReportsProps) {
         const result = task.inference_results?.[0];
         if (result && Array.isArray(result.result_data)) {
           totalDetections += result.result_data.length;
+        }
+
+        // Also collect processing times for overall summary
+        const time = result?.processing_time_ms;
+        if (typeof time === 'number') {
+          allProcessingTimes.push(time);
         }
       });
 
@@ -134,32 +162,6 @@ export function ExportReports({ models }: ExportReportsProps) {
     }
 
     if (analytics.summary.completed_tasks > 0) {
-      const allProcessingTimes: number[] = [];
-
-      for (const model of models) {
-        let query = supabase
-          .from('inference_tasks')
-          .select('inference_results(processing_time_ms)')
-          .eq('model_id', model.id)
-          .eq('status', 'completed');
-
-        const cutoff = getDateFilter();
-        if (cutoff) {
-          query = query.gte('created_at', cutoff);
-        }
-
-        const { data } = await query;
-
-        if (data) {
-          data.forEach((task: any) => {
-            const time = task.inference_results?.[0]?.processing_time_ms;
-            if (typeof time === 'number') {
-              allProcessingTimes.push(time);
-            }
-          });
-        }
-      }
-
       analytics.summary.avg_processing_time =
         allProcessingTimes.length > 0
           ? allProcessingTimes.reduce((a, b) => a + b, 0) / allProcessingTimes.length
