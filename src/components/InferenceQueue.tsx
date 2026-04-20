@@ -137,17 +137,19 @@ export function InferenceQueue({ models }: InferenceQueueProps) {
         if (response.ok) {
           const result = await response.json();
 
-          await supabase.from('inference_results').insert({
-            task_id: task.id,
-            result_data: result.detections,
-            confidence_scores: result.detections.map((d: any) => d.confidence),
-            processing_time_ms: result.processingTimeMs,
-          });
-
-          await supabase
-            .from('inference_tasks')
-            .update({ status: 'completed', completed_at: new Date().toISOString() })
-            .eq('id', task.id);
+          // ⚡ Bolt: Parallelized independent DB writes to halve network wait time
+          await Promise.all([
+            supabase.from('inference_results').insert({
+              task_id: task.id,
+              result_data: result.detections,
+              confidence_scores: result.detections.map((d: any) => d.confidence),
+              processing_time_ms: result.processingTimeMs,
+            }),
+            supabase
+              .from('inference_tasks')
+              .update({ status: 'completed', completed_at: new Date().toISOString() })
+              .eq('id', task.id)
+          ]);
         } else {
           throw new Error('Inference failed');
         }

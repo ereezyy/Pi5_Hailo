@@ -12,3 +12,7 @@
 ## 2024-05-25 - [O(N^2) Array lookups in component iterations]
 **Learning:** In the frontend, using `Array.find()` inside loop iterators (like mapping lists to DOM elements or mapping API results) creates hidden O(N*M) bottlenecks.
 **Action:** Always pre-compute a lookup `Map` with `new Map(items.map(i => [i.id, i]))`, turning the O(N) iteration search into an O(1) key lookup. Use `useMemo` when this happens in a component render to ensure it isn't rebuilt unnecessarily.
+
+## 2024-05-25 - [Redundant DB Operations & Sequential Awaits]
+**Learning:** During batch processing or task execution, the codebase often executes an `INSERT` to create a 'pending' task, immediately followed by an `UPDATE` to mark it 'processing'—wasting a full network roundtrip per loop iteration. Furthermore, when completing a task, `inference_results` `INSERT` and `inference_tasks` `UPDATE` are awaited sequentially, doubling the latency.
+**Action:** Always initialize database rows with their immediate target state when inserting (e.g., `status: 'processing'`) if processing begins synchronously. Additionally, use `Promise.all()` to parallelize independent database write operations (like inserting results and updating task status) to halve the network wait time.
