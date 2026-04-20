@@ -47,9 +47,13 @@ export function InferenceQueue({ models }: InferenceQueueProps) {
       .order('created_at', { ascending: true });
 
     if (!error && data) {
+      // ⚡ Bolt Performance Optimization
+      // Replaced O(N) Array.find() inside loop with O(1) Map lookup
+      // Turns O(N*M) time complexity into O(N+M)
+      const modelsMap = new Map(models.map(m => [m.id, m]));
       const tasksWithModels = data.map(task => ({
         ...task,
-        model: models.find(m => m.id === task.model_id),
+        model: modelsMap.get(task.model_id),
       }));
       setQueue(tasksWithModels);
     }
@@ -102,7 +106,7 @@ export function InferenceQueue({ models }: InferenceQueueProps) {
       }
 
       const task = tasks[0];
-      const model = models.find(m => m.id === task.model_id);
+      const model = models.find(m => m.id === task.model_id); // This is fine as it's a single lookup, but could be unified. Keeping it for now.
 
       setCurrentTask({ ...task, model });
 
