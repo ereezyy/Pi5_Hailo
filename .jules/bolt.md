@@ -16,3 +16,7 @@
 ## 2024-05-25 - [Redundant DB Operations & Sequential Awaits]
 **Learning:** During batch processing or task execution, the codebase often executes an `INSERT` to create a 'pending' task, immediately followed by an `UPDATE` to mark it 'processing'—wasting a full network roundtrip per loop iteration. Furthermore, when completing a task, `inference_results` `INSERT` and `inference_tasks` `UPDATE` are awaited sequentially, doubling the latency.
 **Action:** Always initialize database rows with their immediate target state when inserting (e.g., `status: 'processing'`) if processing begins synchronously. Additionally, use `Promise.all()` to parallelize independent database write operations (like inserting results and updating task status) to halve the network wait time.
+
+## 2024-05-25 - [O(N^2) Getter Recomputations in Render Loops]
+**Learning:** Components that render many DOM elements (like points in a Heatmap) and use unmemoized getter functions (e.g., `getIntensityColor` calling `getMaxIntensity()`) inside their map iterations suffer from massive O(N^2) bottlenecks if those getters filter or map over the data array.
+**Action:** Always pre-calculate array-wide maximums or filtered views using `useMemo` at the component level, and use `useCallback` or pass these computed values down directly so they aren't recalculated per element.

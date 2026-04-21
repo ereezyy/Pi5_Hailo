@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -73,31 +73,31 @@ export function DetectionHeatmap() {
     }
   };
 
-  const getFilteredData = () => {
+  // ⚡ Bolt: Memoized derived state to fix O(N^2) rendering bottleneck.
+  // Previously, `getFilteredData()` and `getMaxIntensity()` were recalculated inside
+  // the render loop for every single point, scaling terribly with many detections.
+  const filteredData = React.useMemo(() => {
     if (selectedClass === 'all') return heatmapData;
     return heatmapData.filter(d => d.class === selectedClass);
-  };
+  }, [heatmapData, selectedClass]);
 
-  const getMaxIntensity = () => {
-    const filtered = getFilteredData();
-    return filtered.length > 0 ? Math.max(...filtered.map(d => d.intensity)) : 1;
-  };
+  const maxIntensity = React.useMemo(() => {
+    return filteredData.length > 0 ? Math.max(...filteredData.map(d => d.intensity)) : 1;
+  }, [filteredData]);
 
-  const getIntensityColor = (intensity: number) => {
-    const maxIntensity = getMaxIntensity();
+  const getIntensityColor = React.useCallback((intensity: number) => {
     const normalized = intensity / maxIntensity;
 
     if (normalized > 0.75) return 'bg-red-500';
     if (normalized > 0.5) return 'bg-orange-500';
     if (normalized > 0.25) return 'bg-yellow-500';
     return 'bg-emerald-500';
-  };
+  }, [maxIntensity]);
 
-  const getIntensityOpacity = (intensity: number) => {
-    const maxIntensity = getMaxIntensity();
+  const getIntensityOpacity = React.useCallback((intensity: number) => {
     const normalized = intensity / maxIntensity;
     return Math.max(0.3, Math.min(1, normalized));
-  };
+  }, [maxIntensity]);
 
   const classColors: Record<string, string> = {
     person: 'bg-blue-500',
@@ -158,7 +158,7 @@ export function DetectionHeatmap() {
                 </radialGradient>
               </defs>
 
-              {getFilteredData().map((point, idx) => (
+              {filteredData.map((point, idx) => (
                 <g key={idx}>
                   <circle
                     cx={point.x}
