@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, PieChart, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -144,9 +144,20 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
     }
   };
 
-  const getTotalTasks = () => stats.reduce((sum, s) => sum + s.totalTasks, 0);
-  const getSuccessRate = (stat: ModelStats) =>
-    stat.totalTasks > 0 ? (stat.completedTasks / stat.totalTasks) * 100 : 0;
+  // ⚡ Bolt: Memoize total tasks to prevent O(N²) recalculations inside the map loop
+  const totalTasks = React.useMemo(() => {
+    return stats.reduce((sum, s) => sum + s.totalTasks, 0);
+  }, [stats]);
+
+  const getSuccessRate = React.useCallback((stat: ModelStats) => {
+    return stat.totalTasks > 0 ? (stat.completedTasks / stat.totalTasks) * 100 : 0;
+  }, []);
+
+  // ⚡ Bolt: Memoize average success rate
+  const avgSuccessRate = React.useMemo(() => {
+    if (stats.length === 0) return 0;
+    return stats.reduce((sum, s) => sum + getSuccessRate(s), 0) / stats.length;
+  }, [stats, getSuccessRate]);
 
   return (
     <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 shadow-xl">
@@ -188,7 +199,7 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
                 <PieChart className="w-4 h-4 text-blue-400" />
                 <span className="text-sm text-slate-400">Total Inferences</span>
               </div>
-              <div className="text-2xl font-bold text-white">{getTotalTasks()}</div>
+              <div className="text-2xl font-bold text-white">{totalTasks}</div>
             </div>
 
             <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
@@ -207,7 +218,7 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
                 <span className="text-sm text-slate-400">Avg Success Rate</span>
               </div>
               <div className="text-2xl font-bold text-white">
-                {(stats.reduce((sum, s) => sum + getSuccessRate(s), 0) / stats.length).toFixed(1)}%
+                {avgSuccessRate.toFixed(1)}%
               </div>
             </div>
           </div>
@@ -217,7 +228,7 @@ export function ModelAnalytics({ models }: ModelAnalyticsProps) {
 
             {stats.map(stat => {
               const successRate = getSuccessRate(stat);
-              const usagePercent = getTotalTasks() > 0 ? (stat.totalTasks / getTotalTasks()) * 100 : 0;
+              const usagePercent = totalTasks > 0 ? (stat.totalTasks / totalTasks) * 100 : 0;
 
               return (
                 <div
