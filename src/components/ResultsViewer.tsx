@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Eye, Download, Clock, Target, Filter, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
@@ -12,7 +12,6 @@ interface ResultWithTask extends InferenceResult {
 
 export function ResultsViewer() {
   const [results, setResults] = useState<ResultWithTask[]>([]);
-  const [filteredResults, setFilteredResults] = useState<ResultWithTask[]>([]);
   const [selectedResult, setSelectedResult] = useState<ResultWithTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -55,21 +54,23 @@ export function ResultsViewer() {
       .limit(10);
 
     if (!error && data) {
-      // @ts-expect-error - Supabase type generation doesn't perfectly handle joins yet
+
       const resultsWithTasks = data as unknown as ResultWithTask[];
       const filtered = resultsWithTasks.filter(r => r.task);
       setResults(filtered);
-      setFilteredResults(filtered);
     }
     setLoading(false);
   };
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, results]);
-
-  const applyFilters = () => {
-    let filtered = [...results];
+  // ⚡ Bolt: Memoize filtered results to prevent O(N) array filter and map re-evaluation on every render
+  const processedFilteredResults = useMemo(() => {
+    let filtered = results.map(r => {
+      const detections = Array.isArray(r.result_data) ? r.result_data : [];
+      const avgConfidence = Array.isArray(r.confidence_scores) && r.confidence_scores.length > 0
+        ? (r.confidence_scores as number[]).reduce((a: number, b: number) => a + b, 0) / r.confidence_scores.length
+        : 0;
+      return { ...r, detections, avgConfidence };
+    });
 
     if (filters.searchTerm) {
       filtered = filtered.filter(r =>
@@ -78,20 +79,15 @@ export function ResultsViewer() {
     }
 
     filtered = filtered.filter(r => {
-      const detections = Array.isArray(r.result_data) ? r.result_data : [];
-      const avgConfidence = Array.isArray(r.confidence_scores)
-        ? r.confidence_scores.reduce((a: number, b: number) => a + b, 0) / r.confidence_scores.length
-        : 0;
-
       return (
-        avgConfidence >= filters.minConfidence &&
+        r.avgConfidence >= filters.minConfidence &&
         r.processing_time_ms <= filters.maxProcessingTime &&
-        detections.length >= filters.minDetections
+        r.detections.length >= filters.minDetections
       );
     });
 
-    setFilteredResults(filtered);
-  };
+    return filtered;
+  }, [filters, results]);
 
   const resetFilters = () => {
     setFilters({
@@ -137,7 +133,7 @@ export function ResultsViewer() {
           </div>
           <h2 className="text-xl font-semibold text-white">Inference Results</h2>
           <span className="px-2 py-1 bg-slate-700 text-slate-300 rounded text-sm">
-            {filteredResults.length} of {results.length}
+            {processedFilteredResults.length} of {results.length}
           </span>
         </div>
 
@@ -225,18 +221,13 @@ export function ResultsViewer() {
         </div>
       )}
 
-      {filteredResults.length === 0 ? (
+      {processedFilteredResults.length === 0 ? (
         <div className="text-center py-8 text-slate-400">
           No results yet. Run some inference tasks to see results here.
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredResults.map((result) => {
-            const detections = Array.isArray(result.result_data) ? result.result_data : [];
-            const avgConfidence = Array.isArray(result.confidence_scores)
-              ? result.confidence_scores.reduce((a: number, b: number) => a + b, 0) / result.confidence_scores.length
-              : 0;
-
+          {processedFilteredResults.map((result) => {
             return (
               <div
                 key={result.id}
@@ -275,12 +266,12 @@ export function ResultsViewer() {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Target className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">{detections.length} detections</span>
+                    <span className="text-slate-300">{result.detections.length} detections</span>
                   </div>
                   <div className="text-sm">
                     <span className="text-slate-400">Avg confidence: </span>
                     <span className="text-emerald-400 font-medium">
-                      {(avgConfidence * 100).toFixed(1)}%
+                      {(result.avgConfidence * 100).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -288,7 +279,7 @@ export function ResultsViewer() {
                 {selectedResult?.id === result.id && (
                   <div className="mt-4 pt-4 border-t border-slate-600">
                     <div className="space-y-2">
-                      {detections.map((detection: any, idx: number) => (
+                      {result.detections.map((detection: any, idx: number) => (
                         <div
                           key={idx}
                           className="p-3 bg-slate-600/50 rounded-lg"

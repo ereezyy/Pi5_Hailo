@@ -20,3 +20,7 @@
 ## 2024-05-25 - [O(N^2) Getter Recomputations in Render Loops]
 **Learning:** Components that render many DOM elements (like points in a Heatmap) and use unmemoized getter functions (e.g., `getIntensityColor` calling `getMaxIntensity()`) inside their map iterations suffer from massive O(N^2) bottlenecks if those getters filter or map over the data array.
 **Action:** Always pre-calculate array-wide maximums or filtered views using `useMemo` at the component level, and use `useCallback` or pass these computed values down directly so they aren't recalculated per element.
+
+## 2024-05-25 - [O(N) Reductions in Render Loops]
+**Learning:** Components that render lists of elements (like mapping API results to cards) and perform `.reduce()` or other O(N) array calculations (e.g. averaging confidence scores) on each item directly within the render return block will recalculate these values on every render cycle.
+**Action:** Use `React.useMemo` to pre-calculate and attach these derived values (like `avgConfidence` and `detections`) to the data items when the data (or filter state) changes, so the render loop only accesses pre-computed primitives.
