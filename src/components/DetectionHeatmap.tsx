@@ -99,6 +99,18 @@ export function DetectionHeatmap() {
     return Math.max(0.3, Math.min(1, normalized));
   }, [maxIntensity]);
 
+  // ⚡ Bolt: Pre-calculate class totals to prevent O(C*N) recalculations
+  // where C is number of classes and N is number of heatmap points
+  // Previously, `.filter()` and `.reduce()` were called for every class on every render
+  const classTotals = React.useMemo(() => {
+    const totals = new Map<string, number>();
+    heatmapData.forEach(d => {
+      const current = totals.get(d.class) || 0;
+      totals.set(d.class, current + d.intensity);
+    });
+    return totals;
+  }, [heatmapData]);
+
   const classColors: Record<string, string> = {
     person: 'bg-blue-500',
     car: 'bg-red-500',
@@ -227,8 +239,7 @@ export function DetectionHeatmap() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {classes.map(cls => {
-              const classData = heatmapData.filter(d => d.class === cls);
-              const total = classData.reduce((sum, d) => sum + d.intensity, 0);
+              const total = classTotals.get(cls) || 0;
 
               return (
                 <div
