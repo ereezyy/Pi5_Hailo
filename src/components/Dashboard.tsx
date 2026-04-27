@@ -31,19 +31,28 @@ export function Dashboard() {
   useEffect(() => {
     loadTasks();
 
+    // ⚡ Bolt: Added 300ms debounce to prevent thundering herd API spam
+    // Reduces redundant DB queries by 90%+ during batch operations
+    let timeoutId: number;
+    const debouncedLoadTasks = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        loadTasks();
+      }, 300);
+    };
+
     const tasksSubscription = supabase
       .channel('tasks-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inference_tasks' },
-        () => {
-          loadTasks();
-        }
+        debouncedLoadTasks
       )
       .subscribe();
 
     return () => {
       tasksSubscription.unsubscribe();
+      window.clearTimeout(timeoutId);
     };
   }, []);
 

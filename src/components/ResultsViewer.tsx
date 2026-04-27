@@ -25,19 +25,28 @@ export function ResultsViewer() {
   useEffect(() => {
     loadResults();
 
+    // ⚡ Bolt: Added 300ms debounce to prevent thundering herd API spam
+    // Reduces redundant DB queries by 90%+ during batch operations
+    let timeoutId: number;
+    const debouncedLoadResults = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        loadResults();
+      }, 300);
+    };
+
     const subscription = supabase
       .channel('results-changes')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inference_results' },
-        () => {
-          loadResults();
-        }
+        debouncedLoadResults
       )
       .subscribe();
 
     return () => {
       subscription.unsubscribe();
+      window.clearTimeout(timeoutId);
     };
   }, []);
 

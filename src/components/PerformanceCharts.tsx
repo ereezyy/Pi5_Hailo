@@ -28,11 +28,6 @@ export function PerformanceCharts() {
     setLoading(false);
   };
 
-  const getMaxValue = (field: keyof AcceleratorStats) => {
-    if (stats.length === 0) return 100;
-    return Math.max(...stats.map(s => Number(s[field]) || 0)) * 1.2;
-  };
-
   const renderMiniChart = (
     data: number[],
     color: string,
