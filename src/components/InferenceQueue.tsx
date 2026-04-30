@@ -22,18 +22,25 @@ export function InferenceQueue({ models }: InferenceQueueProps) {
   useEffect(() => {
     loadQueue();
 
+    // ⚡ Bolt: Added debounce to realtime subscription to prevent thundering herd
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const subscription = supabase
       .channel('queue-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inference_tasks' },
         () => {
-          loadQueue();
+          if (timeoutId) clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            loadQueue();
+          }, 300);
         }
       )
       .subscribe();
 
     return () => {
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

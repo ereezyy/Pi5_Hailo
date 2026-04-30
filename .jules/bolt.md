@@ -24,3 +24,7 @@
 ## 2024-05-25 - [O(N) Reductions in Render Loops]
 **Learning:** Components that render lists of elements (like mapping API results to cards) and perform `.reduce()` or other O(N) array calculations (e.g. averaging confidence scores) on each item directly within the render return block will recalculate these values on every render cycle.
 **Action:** Use `React.useMemo` to pre-calculate and attach these derived values (like `avgConfidence` and `detections`) to the data items when the data (or filter state) changes, so the render loop only accesses pre-computed primitives.
+
+## 2024-05-25 - [Thundering Herd on Realtime Subscriptions]
+**Learning:** React components using Supabase realtime subscriptions (`postgres_changes`) to refetch data can cause a 'thundering herd' of network requests if multiple changes happen quickly (e.g., during batch processing), blocking the frontend.
+**Action:** Wrap the data refetch function triggered by the subscription in a debounce (e.g., a 300ms `setTimeout`), making sure to clear the timeout on new events and component unmount to ensure network requests only fire once after a batch of changes settles.

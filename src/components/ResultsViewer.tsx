@@ -25,18 +25,25 @@ export function ResultsViewer() {
   useEffect(() => {
     loadResults();
 
+    // ⚡ Bolt: Added debounce to realtime subscription to prevent thundering herd
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const subscription = supabase
       .channel('results-changes')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inference_results' },
         () => {
-          loadResults();
+          if (timeoutId) clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            loadResults();
+          }, 300);
         }
       )
       .subscribe();
 
     return () => {
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);

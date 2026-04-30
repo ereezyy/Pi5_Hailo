@@ -31,18 +31,25 @@ export function Dashboard() {
   useEffect(() => {
     loadTasks();
 
+    // ⚡ Bolt: Added debounce to realtime subscription to prevent thundering herd of network requests
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const tasksSubscription = supabase
       .channel('tasks-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inference_tasks' },
         () => {
-          loadTasks();
+          if (timeoutId) clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            loadTasks();
+          }, 300);
         }
       )
       .subscribe();
 
     return () => {
+      if (timeoutId) clearTimeout(timeoutId);
       tasksSubscription.unsubscribe();
     };
   }, []);
