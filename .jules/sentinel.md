@@ -12,3 +12,12 @@
 **Vulnerability:** Leaking raw database or internal server error messages (`error.message`) to the frontend in `useHailoModels.ts` and from the edge function in `hailo-inference/index.ts`.
 **Learning:** Returning raw error messages from backend services or directly rendering raw database errors in the UI can expose sensitive information such as database schemas, internal paths, or unhandled exception details, which violates the "Fail Securely" principle.
 **Prevention:** Always sanitize error messages. Log detailed error traces internally (`console.error` server-side or frontend console for debugging) but return generic, user-friendly error strings to the client or UI to prevent information disclosure.
+## 2025-05-24 - Missing Authorization Check on Edge Functions
+**Vulnerability:** Supabase edge functions not enforcing authentication via the Authorization header, allowing anonymous API access.
+**Learning:** Edge functions are inherently publicly accessible unless explicitly secured. Supabase edge functions generated via Deno.serve must manually validate the Authorization header if the endpoint handles sensitive tasks (like running inferences).
+**Prevention:** Always extract and validate the `req.headers.get('Authorization')` early in the edge function lifecycle before processing any business logic.
+
+## 2025-05-24 - Input Validation for File Uploads
+**Vulnerability:** User-provided `file.name` string in the frontend directly interpolated into a database path field (`/uploaded/models/${file.name}`).
+**Learning:** Even though modern browsers sanitize file names, relying on client-side state without explicit sanitization creates a defense-in-depth vulnerability, as attackers can bypass the browser and inject path traversal characters via direct API calls.
+**Prevention:** Apply a strict regex allowlist sanitization (`file.name.replace(/[^a-zA-Z0-9.-]/g, '_')`) to all user-provided file names before they are used to generate paths or database identifiers.
