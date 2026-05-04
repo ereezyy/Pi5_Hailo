@@ -72,7 +72,9 @@ export function ModelConfig({ models, onUpdate }: ModelConfigProps) {
     setUploadingHef(true);
 
     try {
-      const modelName = file.name.replace('.hef', '');
+      // Security: Sanitize file name to prevent path traversal or special character injection
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const modelName = sanitizedFileName.replace('.hef', '');
 
       const { data: existing } = await supabase
         .from('ai_models')
@@ -89,7 +91,7 @@ export function ModelConfig({ models, onUpdate }: ModelConfigProps) {
         name: modelName,
         description: `Uploaded HEF model: ${modelName}`,
         model_type: 'object_detection',
-        hef_file_path: `/uploaded/models/${file.name}`,
+        hef_file_path: `/uploaded/models/${sanitizedFileName}`,
         input_resolution: '640x640',
         is_active: true,
       });
