@@ -21,3 +21,11 @@
 **Vulnerability:** User-provided `file.name` string in the frontend directly interpolated into a database path field (`/uploaded/models/${file.name}`).
 **Learning:** Even though modern browsers sanitize file names, relying on client-side state without explicit sanitization creates a defense-in-depth vulnerability, as attackers can bypass the browser and inject path traversal characters via direct API calls.
 **Prevention:** Apply a strict regex allowlist sanitization (`file.name.replace(/[^a-zA-Z0-9.-]/g, '_')`) to all user-provided file names before they are used to generate paths or database identifiers.
+## 2024-05-06 - Missing Authentication on Supabase Edge Function
+**Vulnerability:** The `supabase/functions/hailo-inference/index.ts` edge function lacked any `Authorization` header validation, exposing sensitive Hailo hardware interaction endpoints (`/run-inference`, `/models`, `/status`) to unauthenticated, anonymous internet traffic.
+**Learning:** Supabase Edge Functions do not automatically validate `Authorization` headers unless explicitly configured to do so using Supabase Auth or a manual check. Without this, the function acts as an open proxy to internal services.
+**Prevention:** Always implement explicit validation of the `Authorization` header at the top of the Edge Function request handler before routing to sensitive internal APIs.
+## 2024-05-06 - Incomplete Authentication Validation on Edge Functions
+**Vulnerability:** Checking for the presence of the `Authorization` header without validating the token within it allows attackers to bypass security checks by providing arbitrary or fake tokens.
+**Learning:** Security validation must go beyond checking for the existence of security mechanisms (like headers). It requires cryptographic or stateful verification of the tokens to ensure they belong to an authenticated and authorized user. "Security theater" provides a false sense of security while leaving endpoints exposed.
+**Prevention:** Always parse and cryptographically verify tokens using a trusted library or service (e.g., Supabase's `auth.getUser()`) before granting access to sensitive functionality.
