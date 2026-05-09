@@ -99,6 +99,14 @@ export function DetectionHeatmap() {
     return Math.max(0.3, Math.min(1, normalized));
   }, [maxIntensity]);
 
+  // ⚡ Bolt: Pre-calculate class totals to prevent O(C*N) bottleneck in render loop
+  const classTotals = React.useMemo(() => {
+    return heatmapData.reduce((acc, point) => {
+      acc[point.class] = (acc[point.class] || 0) + point.intensity;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [heatmapData]);
+
   const classColors: Record<string, string> = {
     person: 'bg-blue-500',
     car: 'bg-red-500',
@@ -227,8 +235,7 @@ export function DetectionHeatmap() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {classes.map(cls => {
-              const classData = heatmapData.filter(d => d.class === cls);
-              const total = classData.reduce((sum, d) => sum + d.intensity, 0);
+              const total = classTotals[cls] || 0;
 
               return (
                 <div
