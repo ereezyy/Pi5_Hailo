@@ -21,3 +21,8 @@
 **Vulnerability:** User-provided `file.name` string in the frontend directly interpolated into a database path field (`/uploaded/models/${file.name}`).
 **Learning:** Even though modern browsers sanitize file names, relying on client-side state without explicit sanitization creates a defense-in-depth vulnerability, as attackers can bypass the browser and inject path traversal characters via direct API calls.
 **Prevention:** Apply a strict regex allowlist sanitization (`file.name.replace(/[^a-zA-Z0-9.-]/g, '_')`) to all user-provided file names before they are used to generate paths or database identifiers.
+
+## 2026-05-09 - Missing Authentication Validation on Edge Functions
+**Vulnerability:** The Supabase Edge Function `hailo-inference` lacked explicit authentication validation, allowing unauthenticated and anonymous execution of inference tasks via the `/run-inference` endpoint.
+**Learning:** Supabase Edge Functions created with `Deno.serve` do not automatically authenticate requests. A missing authentication check means anyone can invoke the API, potentially leading to unauthorized resource consumption (running inferences) or data access.
+**Prevention:** Always cryptographically verify the incoming token using `supabase.auth.getUser(token)` within the edge function handler. Simply checking for the presence of the `Authorization` header is insufficient; the token itself must be verified to ensure it represents a valid, authenticated user.
