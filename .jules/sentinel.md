@@ -21,3 +21,8 @@
 **Vulnerability:** User-provided `file.name` string in the frontend directly interpolated into a database path field (`/uploaded/models/${file.name}`).
 **Learning:** Even though modern browsers sanitize file names, relying on client-side state without explicit sanitization creates a defense-in-depth vulnerability, as attackers can bypass the browser and inject path traversal characters via direct API calls.
 **Prevention:** Apply a strict regex allowlist sanitization (`file.name.replace(/[^a-zA-Z0-9.-]/g, '_')`) to all user-provided file names before they are used to generate paths or database identifiers.
+
+## 2025-05-12 - [Unauthenticated Edge Functions]
+**Vulnerability:** The Supabase Edge Function `hailo-inference` lacked manual validation of the `Authorization` header, meaning any external user could hit the endpoint if they knew the URL, completely bypassing authentication.
+**Learning:** Supabase Edge Functions do not automatically enforce authentication. They simply receive the `Authorization` header. If the edge function needs to be restricted to logged-in users, the token must be manually passed to `createClient` and verified via `supabase.auth.getUser()`.
+**Prevention:** Always explicitly instantiate the Supabase client with the request's Authorization header and perform `auth.getUser()` to cryptographically verify the caller before processing sensitive endpoints in Edge Functions.
