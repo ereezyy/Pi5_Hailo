@@ -112,6 +112,15 @@ export function DetectionHeatmap() {
     return classColors[className.toLowerCase()] || classColors.default;
   };
 
+  // ⚡ Bolt: Pre-compute total intensities per class in a single O(N) pass to avoid O(C*N) bottlenecks in render loop
+  const classTotals = React.useMemo(() => {
+    const totals: Record<string, number> = {};
+    heatmapData.forEach(d => {
+      totals[d.class] = (totals[d.class] || 0) + d.intensity;
+    });
+    return totals;
+  }, [heatmapData]);
+
   return (
     <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 shadow-xl">
       <div className="flex items-center justify-between mb-6">
@@ -227,8 +236,7 @@ export function DetectionHeatmap() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {classes.map(cls => {
-              const classData = heatmapData.filter(d => d.class === cls);
-              const total = classData.reduce((sum, d) => sum + d.intensity, 0);
+              const total = classTotals[cls] || 0;
 
               return (
                 <div

@@ -28,3 +28,7 @@
 ## 2024-05-25 - [Thundering Herd on Realtime Subscriptions]
 **Learning:** React components using Supabase realtime subscriptions (`postgres_changes`) to refetch data can cause a 'thundering herd' of network requests if multiple changes happen quickly (e.g., during batch processing), blocking the frontend.
 **Action:** Wrap the data refetch function triggered by the subscription in a debounce (e.g., a 300ms `setTimeout`), making sure to clear the timeout on new events and component unmount to ensure network requests only fire once after a batch of changes settles.
+
+## 2024-05-25 - [O(C*N) Computations inside Map Iterations]
+**Learning:** Components that render categories (like filtering heatmap points by class) and perform O(N) operations like `.filter()` and `.reduce()` inside the `.map()` block over categories introduce an $O(C \times N)$ bottleneck on every render.
+**Action:** Avoid inline calculations inside loop iterators. Pre-compute aggregated data in a single $O(N)$ pass outside the render loop using `React.useMemo` to create an $O(1)$ lookup dictionary, significantly reducing calculation overhead.
