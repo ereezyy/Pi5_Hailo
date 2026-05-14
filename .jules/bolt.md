@@ -28,3 +28,7 @@
 ## 2024-05-25 - [Thundering Herd on Realtime Subscriptions]
 **Learning:** React components using Supabase realtime subscriptions (`postgres_changes`) to refetch data can cause a 'thundering herd' of network requests if multiple changes happen quickly (e.g., during batch processing), blocking the frontend.
 **Action:** Wrap the data refetch function triggered by the subscription in a debounce (e.g., a 300ms `setTimeout`), making sure to clear the timeout on new events and component unmount to ensure network requests only fire once after a batch of changes settles.
+
+## 2024-05-25 - [O(C*N) Reductions in Render Loops]
+**Learning:** Components that render categories (like `classes.map` in a Heatmap) and perform `.filter()` and `.reduce()` on the entire dataset inside the map block will recalculate these values repeatedly for every category, scaling poorly (O(C*N) where C is classes and N is data points).
+**Action:** Use `React.useMemo` to pre-calculate these totals in a single O(N) pass, storing them in a lookup object (e.g. `Record<string, number>`), so the render loop only accesses pre-computed primitives.
