@@ -81,6 +81,16 @@ export function DetectionHeatmap() {
     return heatmapData.filter(d => d.class === selectedClass);
   }, [heatmapData, selectedClass]);
 
+  // ⚡ Bolt: Memoize class totals to prevent O(C*N) bottleneck.
+  // Replaced inline filtering and reducing inside the classes.map render loop
+  // with a single O(N) pass to pre-calculate all totals.
+  const classTotals = React.useMemo(() => {
+    return heatmapData.reduce((acc, d) => {
+      acc[d.class] = (acc[d.class] || 0) + d.intensity;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [heatmapData]);
+
   const maxIntensity = React.useMemo(() => {
     return filteredData.length > 0 ? Math.max(...filteredData.map(d => d.intensity)) : 1;
   }, [filteredData]);
@@ -227,8 +237,7 @@ export function DetectionHeatmap() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {classes.map(cls => {
-              const classData = heatmapData.filter(d => d.class === cls);
-              const total = classData.reduce((sum, d) => sum + d.intensity, 0);
+              const total = classTotals[cls] || 0;
 
               return (
                 <div
