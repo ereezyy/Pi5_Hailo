@@ -95,6 +95,15 @@ export function DetectionHeatmap() {
     return filteredData.length > 0 ? Math.max(...filteredData.map(d => d.intensity)) : 1;
   }, [filteredData]);
 
+  // ⚡ Bolt: Memoize class totals to prevent O(N) filtering and reduction inside the map render loop
+  const classTotals = React.useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const d of heatmapData) {
+      totals[d.class] = (totals[d.class] || 0) + d.intensity;
+    }
+    return totals;
+  }, [heatmapData]);
+
   const getIntensityColor = React.useCallback((intensity: number) => {
     const normalized = intensity / maxIntensity;
 
