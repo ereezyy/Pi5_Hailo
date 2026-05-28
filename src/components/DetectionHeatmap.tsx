@@ -81,9 +81,28 @@ export function DetectionHeatmap() {
     return heatmapData.filter(d => d.class === selectedClass);
   }, [heatmapData, selectedClass]);
 
+  // ⚡ Bolt: Memoize class totals to prevent O(C*N) bottleneck.
+  // Replaced inline filtering and reducing inside the classes.map render loop
+  // with a single O(N) pass to pre-calculate all totals.
+  const classTotals = React.useMemo(() => {
+    return heatmapData.reduce((acc, d) => {
+      acc[d.class] = (acc[d.class] || 0) + d.intensity;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [heatmapData]);
+
   const maxIntensity = React.useMemo(() => {
     return filteredData.length > 0 ? Math.max(...filteredData.map(d => d.intensity)) : 1;
   }, [filteredData]);
+
+  // ⚡ Bolt: Memoize class totals to prevent O(N) filtering and reduction inside the map render loop
+  const classTotals = React.useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const d of heatmapData) {
+      totals[d.class] = (totals[d.class] || 0) + d.intensity;
+    }
+    return totals;
+  }, [heatmapData]);
 
   const getIntensityColor = React.useCallback((intensity: number) => {
     const normalized = intensity / maxIntensity;
@@ -98,6 +117,15 @@ export function DetectionHeatmap() {
     const normalized = intensity / maxIntensity;
     return Math.max(0.3, Math.min(1, normalized));
   }, [maxIntensity]);
+
+  // ⚡ Bolt: Memoize class totals to prevent O(C*N) recalculations inside the map loop
+  const classTotals = React.useMemo(() => {
+    const totals: Record<string, number> = {};
+    heatmapData.forEach(d => {
+      totals[d.class] = (totals[d.class] || 0) + d.intensity;
+    });
+    return totals;
+  }, [heatmapData]);
 
   const classColors: Record<string, string> = {
     person: 'bg-blue-500',
@@ -227,8 +255,7 @@ export function DetectionHeatmap() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {classes.map(cls => {
-              const classData = heatmapData.filter(d => d.class === cls);
-              const total = classData.reduce((sum, d) => sum + d.intensity, 0);
+              const total = classTotals[cls] || 0;
 
               return (
                 <div

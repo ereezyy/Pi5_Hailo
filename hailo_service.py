@@ -61,39 +61,18 @@ class HailoService:
 
     def _is_safe_path(self, requested_path):
         """Validate that a requested path is within allowed model paths"""
-        try:
-            real_requested = os.path.realpath(requested_path)
-            for allowed in self.model_paths:
-                real_allowed = os.path.realpath(allowed)
-                if os.path.commonpath([real_allowed, real_requested]) == real_allowed:
-                    return True
-            return False
-        except Exception:
-            return False
+        return is_safe_path(requested_path, self.model_paths)
 
 
     def _is_safe_image_path(self, requested_path):
         """Validate that an image path is within allowed directories"""
-        try:
-            # Allow basic filenames (common in the mock UI)
-            if os.path.basename(requested_path) == requested_path and not requested_path.startswith('/'):
-                return True
-
-            allowed_dirs = [
-                "/tmp",
-                "/home/pi",
-                "/opt/hailo",
-                os.path.abspath(os.getcwd())
-            ]
-
-            real_requested = os.path.realpath(requested_path)
-            for allowed in allowed_dirs:
-                real_allowed = os.path.realpath(allowed)
-                if os.path.commonpath([real_allowed, real_requested]) == real_allowed:
-                    return True
-            return False
-        except Exception:
-            return False
+        allowed_dirs = [
+            "/tmp",
+            "/home/pi",
+            "/opt/hailo",
+            os.path.abspath(os.getcwd())
+        ]
+        return is_safe_path(requested_path, allowed_dirs)
 
     def initialize_device(self):
         """Initialize connection to Hailo device"""
@@ -332,10 +311,10 @@ def run_inference():
     image_path = data.get('imagePath', '/tmp/test_image.jpg')
 
     # Security validation for paths
-    if not hef_path or not is_safe_path(hef_path, hailo_service.model_paths):
+    if not hef_path or not hailo_service._is_safe_path(hef_path):
         return jsonify({"success": False, "error": "Invalid or unauthorized model path"}), 400
 
-    if not is_safe_path(image_path, hailo_service.image_paths):
+    if not hailo_service._is_safe_image_path(image_path):
         return jsonify({"success": False, "error": "Invalid or unauthorized image path"}), 400
 
     result = hailo_service.run_inference(hef_path, image_path)
